@@ -1,0 +1,145 @@
+---
+title: "Transparency Register Analysis"
+format: html
+editor: visual
+---
+
+# Load Packages
+
+```{r}
+library(openxlsx)
+library(tidyverse)
+library(svglite)
+library(paletteer)
+```
+
+# Import Data
+
+```{r}
+
+meetings_data <- openxlsx::read.xlsx(xlsxFile = paste0(getwd(), "/final_data/final_meetings_data.xlsx"))
+
+```
+
+# Analysis
+
+## Number of distinct interest groups
+
+```{r}
+num_distinct_groups <- length(unique(meetings_data$Interest.Group.Name))
+print(num_distinct_groups)
+```
+
+## Origin Country of distinct interest groups
+
+```{r}
+origincountry_distinct <- unique(meetings_data %>% select(Interest.Group.Name, Head.Office)) %>% group_by(Head.Office) %>% summarize(count_of_groups = n()) 
+
+data <- origincountry_distinct %>% arrange(desc(Head.Office)) %>%
+  mutate(prop = count_of_groups / sum(data$count_of_groups) *100) %>%
+  mutate(ypos = (cumsum(prop)- 0.5*prop) )
+
+ggplot(data, aes(x="", y=prop, fill=Head.Office)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) + 
+  scale_fill_paletteer_d("tvthemes::gravityFalls") +
+  theme_void() +
+  geom_text(aes(y = ypos, label = count_of_groups), color = "lightgrey", size=4)
+
+ggsave(filename = "origin country of distinct groups.svg", path = "./Graphics/")
+
+```
+
+## Distribution of interest groups across broad categories
+
+```{r}
+
+distribution_broad <- unique(meetings_data %>% select(Interest.Group.Name, Category.Broad)) %>% group_by(Category.Broad) %>% summarize(count_of_groups = n()) 
+
+data <- distribution_broad %>% arrange(desc(Category.Broad)) %>%
+  mutate(prop = count_of_groups / sum(data$count_of_groups) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+ggplot(data, aes(x="", y=prop, fill=Category.Broad)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) + 
+  scale_fill_paletteer_d("PrettyCols::Bold") +
+  theme_void() +
+  geom_text(aes(y = ypos, label = count_of_groups), color = "white", size=4)
+
+ggsave(filename = "distribution distinct groups broad categories.svg", path = "./Graphics/")
+```
+
+## Distribution of interest groups across detailed categories
+
+```{r}
+
+distribution_detailed <- unique(meetings_data %>% select(Interest.Group.Name, Category.Detailed)) %>% group_by(Category.Detailed) %>% summarize(count_of_groups = n()) 
+
+data <- distribution_detailed %>% arrange(desc(Category.Detailed)) %>%
+  mutate(prop = count_of_groups / sum(data$count_of_groups) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+ggplot(data, aes(x="", y=prop, fill=Category.Detailed)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) + 
+  scale_fill_paletteer_d("MetBrewer::Cross") +
+  theme_void() +
+  geom_text(aes(y = ypos, label = count_of_groups), color = "white", size=4)
+
+ggsave(filename = "distribution distinct groups detailed categories.svg", path = "./Graphics/")
+```
+
+## Distribution of meetings by broad category of interest group
+
+```{r}
+
+distribution_broad <- meetings_data %>% select(Interest.Group.Name, Category.Broad) %>% group_by(Category.Broad) %>% summarize(count_of_groups = n()) 
+
+data <- distribution_broad %>% arrange(desc(Category.Broad)) %>%
+  mutate(prop = count_of_groups / sum(data$count_of_groups) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+ggplot(data, aes(x="", y=prop, fill=Category.Broad)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) + 
+  scale_fill_paletteer_d("PrettyCols::Bold") +
+  theme_void() +
+  geom_text(aes(y = ypos, label = count_of_groups), color = "white", size=4)
+
+ggsave(filename = "meetings distribution of groups broad categories.svg", path = "./Graphics/")
+```
+
+## Distribution of meetings by detailed category of interest group
+
+```{r}
+
+distribution_detailed <- meetings_data %>% select(Interest.Group.Name, Category.Detailed) %>% group_by(Category.Detailed) %>% summarize(count_of_groups = n()) 
+
+data <- distribution_detailed %>% arrange(desc(Category.Detailed)) %>%
+  mutate(prop = count_of_groups / sum(data$count_of_groups) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop )
+
+ggplot(data, aes(x="", y=prop, fill=Category.Detailed)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) + 
+  scale_fill_paletteer_d("MetBrewer::Cross") +
+  theme_void() +
+  geom_text(aes(y = ypos, label = count_of_groups), color = "white", size=4)
+
+ggsave(filename = "meetings distribution of groups detailed categories.svg", path = "./Graphics/")
+```
+
+## Table of meetings per interest group
+
+```{r}
+meetings_per_group <- meetings_data %>% group_by(Interest.Group.Name) %>% summarise(num.of.meetings = n())
+meetings_per_group <- unique(left_join(x = meetings_per_group, 
+                                       y = meetings_data %>% select(
+                                         Interest.Group.Name, 
+                                         Category.Broad, 
+                                         Category.Detailed), 
+                                       by = "Interest.Group.Name") ) %>% relocate(num.of.meetings, .after = Category.Detailed)
+```
+
+## Distribution (and Table) of Meetings with high-ranking EC members such as (Vice) President, Commissioner 
