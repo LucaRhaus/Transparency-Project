@@ -11,6 +11,7 @@ library(openxlsx)
 library(tidyverse)
 library(svglite)
 library(paletteer)
+library(stringr)
 ```
 
 # Import Data
@@ -37,9 +38,9 @@ print(num_distinct_groups)
 ## Origin Country of distinct interest groups
 
 ```{r}
-origincountry_distinct <- unique(meetings_data %>% select(Interest.Group.Name, Head.Office)) %>% group_by(Head.Office) %>% summarize(count_of_groups = n()) 
+origincountry_df <- (meetings_data %>% select(Interest.Group.Name, Head.Office)) %>% group_by(Head.Office) %>% summarize(count_of_groups = n()) 
 
-data <- origincountry_distinct
+data <- origincountry_df
 
 data <- data %>% arrange(desc(Head.Office)) %>%
   mutate(prop = count_of_groups / sum(data$count_of_groups) *100) %>%
@@ -54,6 +55,27 @@ ggplot(data, aes(x="", y=prop, fill=Head.Office)) +
 
 ggsave(filename = "origin country of distinct groups.svg", path = "./Graphics/")
 
+```
+
+## Origin Region of interest groups (not distinct)
+
+```{r}
+origincountry_df <- (meetings_data %>% select(Interest.Group.Name, Region)) %>% group_by(Region) %>% summarize(count_of_groups = n()) 
+
+data <- origincountry_df
+
+data <- data %>% arrange(desc(Region)) %>%
+  mutate(prop = count_of_groups / sum(data$count_of_groups) *100) %>%
+  mutate(ypos = (cumsum(prop)- 0.5*prop) )
+
+ggplot(data, aes(x="", y=prop, fill=Region)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) + 
+  scale_fill_paletteer_d("fishualize::Callanthias_australis", -1) +
+  theme_void() +
+  geom_text(aes(y = ypos, label = count_of_groups), color = "lightgrey", size=4)
+
+ggsave(filename = "origin region of not distinct groups.svg", path = "./Graphics/")
 ```
 
 ## Distribution of interest groups across broad categories
@@ -152,17 +174,149 @@ meetings_per_group <- unique(left_join(x = meetings_per_group,
 
 ```{r}
 
- # library
-library(ggplot2)
- 
-# create a dataset
-specie <- c(rep("sorgho" , 3) , rep("poacee" , 3) , rep("banana" , 3) , rep("triticum" , 3) )
-condition <- rep(c("normal" , "stress" , "Nitrogen") , 4)
-value <- abs(rnorm(12 , 0 , 15))
-data <- data.frame(specie,condition,value)
- 
-# Grouped
-ggplot(data, aes(fill=condition, y=value, x=specie)) + 
-    geom_bar(position="dodge", stat="identity")
 
+meetings_data$High.Ranked <- ifelse(
+  str_detect(meetings_data$Title.of.EC.representative, "Commissioner") | 
+    str_detect(meetings_data$Title.of.EC.representative, "President"), 
+  "(Vice-) President,\n Commissioner", 
+  "EC Cabinet member,\n Director General")
+  
+data <- meetings_data %>% select(Interest.Group.Name, High.Ranked, Category.Broad) %>% group_by(High.Ranked, Category.Broad) %>% summarise(Count.Of.Meetings = n())
+
+print(data)
+
+# Broad Categories
+ggplot(data, aes(fill=Category.Broad, y=Count.Of.Meetings, x=High.Ranked)) +
+   geom_bar(position="dodge", stat="identity") +
+  ylim(0, 67) +
+  scale_fill_paletteer_d("PrettyCols::Bold") + 
+  geom_text(
+    aes(label = Count.Of.Meetings),
+    position = position_dodge(width = 0.9),  # Damit die Zahlen über den Balken bleiben
+    vjust = -0.3,  # Leicht über den Balken platzieren
+    size = 3                               
+  ) +
+  theme_light()
+
+ggsave(filename = "barchart meetings distribution high- vs low-ranking.svg", path = "./Graphics/")
+
+# detailed categories
+ggplot(data, aes(fill=Category.Broad, y=Count.Of.Meetings, x=High.Ranked)) +
+   geom_bar(position="fill", stat="identity") +
+  scale_fill_paletteer_d("PrettyCols::Bold") +
+  theme_light()
+
+ggsave(filename = "barchart meetings distribution high- vs low-ranking filled.svg", path = "./Graphics/")
+```
+
+## Most frequent interest groups
+
+```{r}
+interestgroups_frequency <- meetings_data %>% group_by(Interest.Group.Name) %>% summarise(Count.Of.Meetings = n())
+interestgroups_frequency <- interestgroups_frequency[order(interestgroups_frequency$Count.Of.Meetings, decreasing = TRUE), ]  
+
+# X-Labels umbrechen
+interestgroups_frequency$Interest.Group.Name <- stringr::str_wrap(interestgroups_frequency$Interest.Group.Name, width = 50)
+
+ggplot(interestgroups_frequency[1:10, ], aes(fill = Interest.Group.Name, x = Interest.Group.Name, y = Count.Of.Meetings)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  ylim(0, 22) +
+  geom_text(
+    aes(label = Count.Of.Meetings),   
+    vjust = -0.3,                     
+    size = 3                          
+  ) +
+  scale_fill_paletteer_d("ggthemes::Classic_10") +
+  theme_light() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    legend.title.position = "top",
+    legend.title = element_blank(),
+    #legend.key.size = unit(0.5, "cm"),  # Einheitliche Symbolgröße
+    legend.key.width = unit(0.5, "cm"),
+    legend.key.height = unit(0.4, "cm")
+  ) +
+  guides(
+    fill = guide_legend(
+      nrow = 5,
+      byrow = TRUE,
+      override.aes = list(size = 5)     # Einheitliche Größe der Legenden-Blöcke
+    )
+  ) +
+  coord_cartesian(clip = 'off')
+
+ggsave(filename = "barchart most frequent interestgroups.svg", path = "./Graphics/")
+```
+
+## Who are the Commissioners that interest groups have their meetings with?
+
+```{r}
+interesting_individuals <- c("Margrethe Vestager", "Thierry Breton", 
+                             "Ursula von der Leyen", "Johannes Hahn", 
+                             "Valdis Dombrovskis", "Nicolas Schmit")
+
+commissioner_data <- meetings_data %>% filter(High.Ranked == "(Vice-) President,\n Commissioner")
+
+commissioner_data$Commissioner.Name <- ifelse(str_detect(commissioner_data$Name.of.EC.representative, interesting_individuals[1]), yes = interesting_individuals[1], no =
+                                              ifelse(str_detect(commissioner_data$Name.of.EC.representative, interesting_individuals[2]), yes = interesting_individuals[2], no = ifelse(str_detect(commissioner_data$Name.of.EC.representative, interesting_individuals[3]), yes = "Ursula von\nder Leyen", no = ifelse(str_detect(commissioner_data$Name.of.EC.representative, interesting_individuals[4]), yes = interesting_individuals[4], no = ifelse(str_detect(commissioner_data$Name.of.EC.representative, interesting_individuals[5]), yes = interesting_individuals[5], no = ifelse(str_detect(commissioner_data$Name.of.EC.representative, interesting_individuals[6]), yes = interesting_individuals[6], no = "ERROR"))))))
+
+summarised_df <- commissioner_data %>%
+  group_by(Commissioner.Name, Category.Detailed) %>%
+  summarise(Count.Of.Meetings = n(), .groups = "drop")
+
+# Sicherstellen, dass alle Kombinationen existieren, fehlende Werte mit 0 ersetzen
+commissioner_data_summarised_categorized <- summarised_df %>%
+  complete(Commissioner.Name, Category.Detailed, fill = list(Count.Of.Meetings = 0))
+
+
+ggplot(commissioner_data_summarised_categorized, aes(fill=Category.Detailed, y=Count.Of.Meetings, x=Commissioner.Name)) +
+   geom_bar(position="dodge", stat="identity") +
+  scale_fill_paletteer_d("ggthemes::Classic_10") + theme_light() +
+  theme(legend.position = "bottom",     legend.title = element_blank()) + 
+   guides(
+    fill = guide_legend(
+      ncol = 2,
+      byrow = TRUE,
+      override.aes = list(size = 5)     # Einheitliche Größe der Legenden-Blöcke
+    )
+  ) 
+
+ggsave(filename = "barchart most commissioner frequencys.svg", path = "./Graphics/")
+```
+
+## Timeline of meetings
+
+```{r}
+library(hrbrthemes)
+library(ggthemes)
+
+timeseries_data <- meetings_data
+
+# Datum auf den ersten Tag des Monats setzen
+timeseries_data$Date.of.meeting <- as.Date(format(as.Date(timeseries_data$Date.of.meeting), "%Y-%m-01"))
+
+# Gruppieren und Anzahl der Meetings pro Monat zählen
+timeseries_data <- timeseries_data %>%
+  group_by(Date.of.meeting) %>%
+  summarise(Number.Of.Meetings = n(), .groups = "drop")
+
+# Fehlende Monate ergänzen und mit 0 füllen
+timeseries_data <- timeseries_data %>%
+  complete(Date.of.meeting = seq(min(Date.of.meeting), max(Date.of.meeting), by = "month"),
+           fill = list(Number.Of.Meetings = 0))
+
+# Plot
+timeseries_data %>%
+  ggplot(aes(x = Date.of.meeting, y = Number.Of.Meetings)) +
+  geom_line(color = "#1f77b4", size = 1.1) +
+  ylim(0, 30) +
+  annotate(geom = "text", x = as.Date("2022-02-01"), y = 0.5, color = "#ff7f0e",
+           label = "EC & Parlament Einigung") +
+  annotate(geom = "point", x = as.Date("2022-02-01"), y = 2, size = 7, shape = 21, fill = "transparent", color = "#ff7f0e") +
+  theme_light()
+
+ggsave(filename = "meetings timeline.svg", path = "./Graphics/")
 ```
