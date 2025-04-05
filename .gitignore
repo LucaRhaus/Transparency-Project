@@ -1,5 +1,6 @@
 ### Python ###
 .venv/
+.idea/
 graphics/
 
 ### R ###
