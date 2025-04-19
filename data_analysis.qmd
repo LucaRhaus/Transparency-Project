@@ -68,7 +68,7 @@ ggplot(data, aes(x="", y=prop, fill=Region)) +
 ggsave(filename = "origin region of not distinct groups.svg", path = "./Graphics/")
 ```
 
-## Origin Country of interest groups in Europe (not distinct)
+## Origin Country of interest groups *in Europe* (not distinct)
 
 ```{r}
 origincountry_df <- (meetings_data %>% filter(Region %in% c("EUROPE", "EUROPE (NON-EU)")) %>% select(`Interest Group Name`, `Head Office`)) %>% group_by(`Head Office`) %>% summarize(count_of_groups = n()) 
@@ -91,7 +91,7 @@ ggsave(filename = "origin country of distinct groups.svg", path = "./Graphics/")
 
 ```
 
-## Distribution of interest groups across broad categories
+## Distribution of interest groups across broad categories (unique, probably not interesting)
 
 ```{r}
 
@@ -303,19 +303,19 @@ interesting_individuals <- c("Margrethe Vestager", "Thierry Breton",
 
 commissioner_data <- meetings_data %>% filter(`High Ranked` == "(Vice-) President,\n Commissioner")
 
-commissioner_data$Commissioner.Name <- ifelse(str_detect(commissioner_data$`Name of EC representative`, interesting_individuals[1]), yes = interesting_individuals[1], no =
+commissioner_data$`Commissioner Name` <- ifelse(str_detect(commissioner_data$`Name of EC representative`, interesting_individuals[1]), yes = interesting_individuals[1], no =
                                               ifelse(str_detect(commissioner_data$`Name of EC representative`, interesting_individuals[2]), yes = interesting_individuals[2], no = ifelse(str_detect(commissioner_data$`Name of EC representative`, interesting_individuals[3]), yes = "Ursula von\nder Leyen", no = ifelse(str_detect(commissioner_data$`Name of EC representative`, interesting_individuals[4]), yes = interesting_individuals[4], no = ifelse(str_detect(commissioner_data$`Name of EC representative`, interesting_individuals[5]), yes = interesting_individuals[5], no = ifelse(str_detect(commissioner_data$`Name of EC representative`, interesting_individuals[6]), yes = interesting_individuals[6], no = "ERROR"))))))
 
 summarised_df <- commissioner_data %>%
-  group_by(Commissioner.Name, `Category Detailed`) %>%
+  group_by(`Commissioner Name`, `Category Detailed`) %>%
   summarise(`Number of Meetings` = n(), .groups = "drop")
 
 # Sicherstellen, dass alle Kombinationen existieren, fehlende Werte mit 0 ersetzen
 commissioner_data_summarised_categorized <- summarised_df %>%
-  complete(Commissioner.Name, `Category Detailed`, fill = list(`Number of Meetings` = 0))
+  complete(`Commissioner Name`, `Category Detailed`, fill = list(`Number of Meetings` = 0))
 
 
-ggplot(commissioner_data_summarised_categorized, aes(fill=`Category Detailed`, y=`Number of Meetings`, x=Commissioner.Name)) +
+ggplot(commissioner_data_summarised_categorized, aes(fill=`Category Detailed`, y=`Number of Meetings`, x=`Commissioner Name`)) +
    geom_bar(position="dodge", stat="identity") +
   scale_fill_paletteer_d("ggthemes::Classic_10") + theme_light() +
   theme(legend.position = "bottom",     
@@ -375,7 +375,6 @@ ggplot(interestgroups_frequency[1:10, ], aes(fill = `Interest Group Name`, x = `
 ggsave(filename = "barchart most frequent interestgroups.svg", path = "./Graphics/")
 ```
 
-
 ## Timeline of meetings
 
 ```{r}
@@ -422,10 +421,12 @@ timeseries_data %>%
   annotate(geom = "text", x = as.Date("2023-05-15"), y = 14, color = "#ff7f0e",
          label = "Verabschiedung des    \nChips Acts durch    \ndas EU-Parlament    ") +
   
-  annotate(geom = "point", x = as.Date("2023-07-01"), y = 0, size = 7, shape = 21, fill = "transparent", color = "#ff7f0e", radius = 0.9) +
+  annotate(geom = "point", x = as.Date("2023-07-01"), y = 0, size = 7, shape = 21, fill = "transparent", color = "#ff7f0e") +
   
   annotate("segment", x = as.Date("2023-07-01"), xend = as.Date("2023-06-15"), y = 1, yend = 11, colour = "#ff7f0e") +
-  theme_light()
+  scale_x_date(date_breaks = "3 months" , date_labels = "%m/%y", minor_breaks = NULL) +
+  theme_light() 
+
 
 ggsave(filename = "meetings timeline.svg", path = "./Graphics/")
 write.xlsx(timeseries_data, file = "./tables/timeseries_data.xlsx")
